@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝のプランナー</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f0f0f; --surface:#181818; --surface2:#1e1e1e;
+  --border:#2a2a2a; --border2:#333;
+  --text:#e8e8e8; --muted:#666; --muted2:#999;
+  --green:#c8f060; --amber:#f0a020; --red:#ff4444; --blue:#60b8f0;
+  --mono:'DM Mono',monospace; --sans:'Zen Kaku Gothic New',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:200;}
+.topbar-title{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+.nav-row{display:flex;gap:6px;}
+.nav-btn{font-family:var(--mono);font-size:11px;padding:5px 13px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;letter-spacing:.05em;transition:all .15s;}
+.nav-btn:hover,.nav-btn.active{border-color:var(--green);color:var(--green);}
+
+.view{display:none;flex:1;flex-direction:column;}
+.view.active{display:flex;}
+
+/* ── PLAN VIEW ── */
+#view-plan{align-items:center;padding:32px 20px 80px;}
+.plan-view-inner{width:100%;max-width:480px;display:flex;flex-direction:column;gap:20px;}
+.set-row{display:flex;gap:8px;align-items:center;}
+.set-row label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;min-width:72px;}
+.set-select{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;cursor:pointer;transition:border-color .15s;}
+.set-select:focus{border-color:var(--green);}
+.time-block label{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;}
+.time-input-row input[type=time]{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:28px;padding:12px 16px;outline:none;transition:border-color .15s;}
+.time-input-row input[type=time]:focus{border-color:var(--green);}
+.alarm-presets{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.preset-pill{font-family:var(--mono);font-size:11px;padding:4px 11px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .15s;}
+.preset-pill:hover{border-color:var(--amber);color:var(--amber);}
+.go-btn{width:100%;padding:15px;background:var(--green);color:#0f0f0f;border:none;font-family:var(--sans);font-weight:900;font-size:15px;cursor:pointer;transition:opacity .15s;}
+.go-btn:hover{opacity:.85;}
+
+/* plan card */
+.plan-card{width:100%;max-width:480px;border:1px solid var(--border);overflow:hidden;animation:fadeUp .25s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.plan-header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);}
+.plan-badge{font-family:var(--mono);font-size:10px;padding:2px 9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;}
+.plan-name{font-weight:700;font-size:14px;}
+.plan-desc{font-family:var(--mono);font-size:11px;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--border);line-height:1.6;}
+.sec-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:10px 16px 5px;}
+.task-item{display:flex;align-items:center;gap:10px;padding:9px 16px;border-top:1px solid var(--border);cursor:pointer;transition:background .1s;user-select:none;}
+.task-item:hover{background:rgba(255,255,255,.03);}
+.task-item.done .task-label{text-decoration:line-through;color:var(--muted);}
+.task-check{width:17px;height:17px;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s;}
+.task-item.must .task-check{border-color:var(--green);}
+.task-item.must.done .task-check{background:var(--green);color:#0f0f0f;border-color:var(--green);}
+.task-item.opt.done .task-check{background:var(--muted);color:#0f0f0f;border-color:var(--muted);}
+.task-label{font-size:13px;flex:1;}
+.task-mins{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.blocker-bar{padding:9px 16px;background:rgba(255,68,68,.08);border-top:1px solid rgba(255,68,68,.2);font-family:var(--mono);font-size:10px;color:var(--red);display:none;}
+.blocker-bar.on{display:block;}
+.prog-wrap{padding:12px 16px;border-top:1px solid var(--border);}
+.prog-bg{height:2px;background:var(--border);}
+.prog-fill{height:100%;background:var(--green);transition:width .3s ease;}
+.prog-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;}
+.done-msg{padding:18px 16px;text-align:center;font-weight:700;font-size:16px;color:var(--green);display:none;border-top:1px solid var(--border);}
+.done-msg.on{display:block;}
+
+/* ── EDIT VIEW ── */
+#view-edit{padding:28px 20px 80px;align-items:center;}
+.edit-inner{width:100%;max-width:640px;display:flex;flex-direction:column;gap:0;}
+.edit-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:24px;}
+.edit-tab{font-family:var(--mono);font-size:11px;padding:8px 16px;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:.05em;}
+.edit-tab.active{color:var(--green);border-bottom-color:var(--green);}
+.edit-panel{display:none;}
+.edit-panel.active{display:block;}
+
+.set-manager-head{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.set-manager-head select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 10px;outline:none;cursor:pointer;flex:1;min-width:120px;}
+.set-manager-head select:focus{border-color:var(--green);}
+.icon-btn{font-family:var(--mono);font-size:10px;padding:5px 10px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.icon-btn:hover{border-color:var(--green);color:var(--green);}
+.icon-btn.danger:hover{border-color:var(--red);color:var(--red);}
+.icon-btn.export:hover{border-color:var(--blue);color:var(--blue);}
+
+.rename-row{display:flex;gap:6px;margin-bottom:14px;align-items:center;}
+.rename-row input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none;}
+.rename-row input:focus{border-color:var(--green);}
+.rename-row button{font-family:var(--mono);font-size:10px;padding:7px 12px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .15s;}
+.rename-row button:hover{border-color:var(--green);color:var(--green);}
+
+.preset-edit-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.preset-edit-item{display:flex;align-items:center;gap:3px;border:1px solid var(--border);padding:3px 8px;}
+.preset-edit-item input[type=time]{background:none;border:none;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;width:82px;padding:0;}
+.add-small-btn{font-family:var(--mono);font-size:10px;padding:5px 11px;border:1px dashed var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .15s;}
+.add-small-btn:hover{border-color:var(--green);color:var(--green);}
+
+.plan-edit-block{border:1px solid var(--border);margin-bottom:8px;overflow:hidden;}
+.plan-edit-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface);cursor:pointer;user-select:none;}
+.plan-edit-hdr .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.plan-edit-hdr .plabel{font-family:var(--mono);font-size:11px;flex:1;}
+.del-plan-btn{font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 4px;transition:color .1s;}
+.del-plan-btn:hover{color:var(--red);}
+.plan-edit-body{padding:12px;display:none;}
+.plan-edit-body.open{display:block;}
+.field-row{display:flex;flex-direction:column;gap:3px;margin-bottom:9px;}
+.field-row label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+.field-row input{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:13px;padding:6px 9px;outline:none;width:100%;transition:border-color .15s;}
+.field-row input:focus{border-color:var(--green);}
+.task-edit-list{list-style:none;}
+.task-edit-row{display:flex;align-items:center;gap:5px;margin-bottom:4px;}
+.task-edit-row input[type=text]{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:12px;padding:5px 8px;outline:none;}
+.task-edit-row input[type=text]:focus{border-color:var(--green);}
+.mins-input{font-family:var(--mono);font-size:11px;width:46px;background:var(--bg);border:1px solid var(--border);color:var(--muted);padding:5px 4px;outline:none;text-align:center;}
+.del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px;transition:color .1s;}
+.del-btn:hover{color:var(--red);}
+.add-task-btn{font-family:var(--mono);font-size:10px;padding:5px 10px;border:1px dashed var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .15s;width:100%;margin-top:2px;}
+.add-task-btn:hover{border-color:var(--green);color:var(--green);}
+.add-plan-btn{font-family:var(--mono);font-size:11px;padding:8px;border:1px dashed var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .15s;width:100%;margin-top:4px;}
+.add-plan-btn:hover{border-color:var(--amber);color:var(--amber);}
+
+.save-btn{width:100%;padding:12px;background:var(--green);color:#0f0f0f;border:none;font-family:var(--sans);font-weight:900;font-size:14px;cursor:pointer;transition:opacity .15s;margin-top:14px;}
+.save-btn:hover{opacity:.85;}
+.save-notice{font-family:var(--mono);font-size:10px;color:var(--green);text-align:center;margin-top:5px;opacity:0;transition:opacity .3s;}
+.save-notice.on{opacity:1;}
+
+.io-desc{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.8;}
+.import-zone{border:1px dashed var(--border);padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;}
+.import-zone:hover{border-color:var(--blue);}
+.import-zone label{font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer;}
+.import-zone input{display:none;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:none;align-items:center;justify-content:center;}
+.modal-overlay.on{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);padding:22px;min-width:260px;max-width:340px;width:90%;}
+.modal h3{font-size:13px;margin-bottom:12px;}
+.modal input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:13px;padding:8px 10px;outline:none;margin-bottom:12px;}
+.modal input:focus{border-color:var(--green);}
+.modal-btns{display:flex;gap:7px;justify-content:flex-end;}
+.modal-btns button{font-family:var(--mono);font-size:10px;padding:6px 13px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;}
+.modal-btns .ok{border-color:var(--green);color:var(--green);}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">morning.plan</span>
+  <div class="nav-row">
+    <button class="nav-btn active" onclick="switchView('plan',this)">今日</button>
+    <button class="nav-btn" onclick="switchView('edit',this)">編集</button>
+  </div>
+</div>
+
+<!-- PLAN VIEW -->
+<div id="view-plan" class="view active">
+  <div class="plan-view-inner">
+    <div class="set-row">
+      <label>アラームset</label>
+      <select class="set-select" id="sel-alarm-set" onchange="onAlarmSetChange()"></select>
+    </div>
+    <div class="set-row">
+      <label>プランset</label>
+      <select class="set-select" id="sel-plan-set" onchange="onPlanSetChange()"></select>
+    </div>
+    <div class="time-block">
+      <label>起きた時刻</label>
+      <div class="time-input-row"><input type="time" id="wakeTime" value="07:00"></div>
+      <div class="alarm-presets" id="alarmPresets"></div>
+    </div>
+    <button class="go-btn" onclick="buildPlan()">▶ プランを確定する</button>
+    <div class="plan-card" id="planCard" style="display:none"></div>
+  </div>
+</div>
+
+<!-- EDIT VIEW -->
+<div id="view-edit" class="view">
+  <div class="edit-inner">
+    <div class="edit-tabs">
+      <button class="edit-tab active" onclick="switchEditTab('alarms',this)">アラームセット</button>
+      <button class="edit-tab" onclick="switchEditTab('plans',this)">プランセット</button>
+      <button class="edit-tab" onclick="switchEditTab('io',this)">エクスポ／インポ</button>
+    </div>
+
+    <!-- ALARM SETS -->
+    <div class="edit-panel active" id="panel-alarms">
+      <div class="set-manager-head">
+        <select id="alarm-set-select" onchange="loadAlarmSetEditor()"></select>
+        <button class="icon-btn" onclick="newAlarmSet()">＋ 新規</button>
+        <button class="icon-btn danger" onclick="deleteAlarmSet()">削除</button>
+        <button class="icon-btn export" onclick="exportAlarmSet()">↓ JSON</button>
+      </div>
+      <div class="rename-row">
+        <input type="text" id="alarm-set-name" placeholder="セット名">
+        <button onclick="renameAlarmSet()">リネーム</button>
+      </div>
+      <div class="preset-edit-list" id="alarm-preset-list"></div>
+      <button class="add-small-btn" onclick="addAlarmPreset()">＋ 時刻を追加</button>
+      <button class="save-btn" onclick="saveAlarmSetEditor()">このセットを保存</button>
+      <div class="save-notice" id="alarm-save-notice">✓ 保存しました</div>
+    </div>
+
+    <!-- PLAN SETS -->
+    <div class="edit-panel" id="panel-plans">
+      <div class="set-manager-head">
+        <select id="plan-set-select" onchange="loadPlanSetEditor()"></select>
+        <button class="icon-btn" onclick="newPlanSet()">＋ 新規</button>
+        <button class="icon-btn danger" onclick="deletePlanSet()">削除</button>
+        <button class="icon-btn export" onclick="exportPlanSet()">↓ JSON</button>
+      </div>
+      <div class="rename-row">
+        <input type="text" id="plan-set-name" placeholder="セット名">
+        <button onclick="renamePlanSet()">リネーム</button>
+      </div>
+      <div id="plan-edit-blocks"></div>
+      <button class="add-plan-btn" onclick="addPlan()">＋ プランを追加</button>
+      <button class="save-btn" onclick="savePlanSetEditor()">このセットを保存</button>
+      <div class="save-notice" id="plan-save-notice">✓ 保存しました</div>
+    </div>
+
+    <!-- EXPORT / IMPORT -->
+    <div class="edit-panel" id="panel-io">
+      <p class="io-desc">全データ（全セット）をまとめてエクスポート／インポートします。<br>インポートは既存データに<strong style="color:var(--amber)">上書き</strong>されます。</p>
+      <button class="icon-btn export" style="width:100%;padding:11px;font-size:12px;margin-bottom:12px" onclick="exportAll()">↓ 全データをJSONでダウンロード</button>
+      <div class="import-zone">
+        <label>↑ JSONファイルを選択してインポート<input type="file" accept=".json" onchange="importAll(event)"></label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <input type="text" id="modal-input">
+    <div class="modal-btns">
+      <button onclick="closeModal()">キャンセル</button>
+      <button class="ok" id="modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DEFAULT DATA ────────────────────────────────────────────────
+const DEFAULT = {
+  alarmSets:[
+    {id:'as1',name:'平日（仕事あり）',presets:['06:30','07:00','07:15','07:30']},
+    {id:'as2',name:'平日（仕事なし）',presets:['07:00','07:30','08:00']},
+    {id:'as3',name:'休日',presets:['08:00','09:00','10:00']},
+  ],
+  planSets:[
+    {id:'ps1',name:'通常出勤',plans:[
+      {id:'A',name:'プランA — フル',color:'#c8f060',cutoff:'07:15',desc:'余裕あり。朝食・シャワー・準備を丁寧に。',
+       mustTasks:[{label:'顔を洗う',minutes:3},{label:'シャワー',minutes:10},{label:'着替え',minutes:5}],
+       optTasks:[{label:'朝食',minutes:15},{label:'ストレッチ',minutes:5},{label:'天気確認',minutes:2}]},
+      {id:'B',name:'プランB — 簡略',color:'#f0a020',cutoff:'07:45',desc:'やや余裕なし。最低限の準備＋軽い朝食。',
+       mustTasks:[{label:'顔を洗う',minutes:3},{label:'着替え',minutes:5},{label:'水分',minutes:1}],
+       optTasks:[{label:'シャワー（短め）',minutes:5},{label:'軽食',minutes:3}]},
+      {id:'C',name:'プランC — 最低限',color:'#ff8040',cutoff:'08:15',desc:'ギリギリ。身だしなみだけ整えて出る。',
+       mustTasks:[{label:'顔を洗う',minutes:2},{label:'着替え',minutes:4}],
+       optTasks:[{label:'水分',minutes:1}]},
+      {id:'D',name:'プランD — 緊急',color:'#ff4444',cutoff:null,desc:'遅刻確定。職場への連絡を最優先。',
+       mustTasks:[{label:'職場に連絡',minutes:3},{label:'着替え',minutes:3}],
+       optTasks:[{label:'顔を洗う',minutes:2}]},
+    ]},
+    {id:'ps2',name:'朝仕事あり',plans:[
+      {id:'A',name:'プランA — 仕事前余裕',color:'#c8f060',cutoff:'06:45',desc:'朝作業時間も確保。早起き成功。',
+       mustTasks:[{label:'顔を洗う',minutes:3},{label:'着替え',minutes:5},{label:'PC起動',minutes:2}],
+       optTasks:[{label:'朝食',minutes:15},{label:'ストレッチ',minutes:5}]},
+      {id:'B',name:'プランB — 仕事優先',color:'#f0a020',cutoff:'07:15',desc:'朝仕事に集中。準備は最小限に。',
+       mustTasks:[{label:'顔を洗う',minutes:3},{label:'着替え',minutes:5},{label:'作業開始',minutes:2}],
+       optTasks:[{label:'軽食',minutes:5}]},
+      {id:'C',name:'プランC — 仕事スキップ',color:'#ff4444',cutoff:null,desc:'朝仕事は断念。通常出勤モードへ。',
+       mustTasks:[{label:'顔を洗う',minutes:3},{label:'着替え',minutes:5}],
+       optTasks:[{label:'水分',minutes:1}]},
+    ]},
+    {id:'ps3',name:'休日',plans:[
+      {id:'A',name:'ゆっくりモード',color:'#60b8f0',cutoff:'10:00',desc:'急がない。好きなペースで。',
+       mustTasks:[{label:'水分を取る',minutes:2}],
+       optTasks:[{label:'朝食',minutes:20},{label:'散歩',minutes:30},{label:'読書',minutes:30}]},
+      {id:'B',name:'午前中に動く',color:'#c8f060',cutoff:null,desc:'午後の予定があるなら早めに動く。',
+       mustTasks:[{label:'顔を洗う',minutes:3},{label:'朝食',minutes:15}],
+       optTasks:[{label:'シャワー',minutes:10},{label:'準備',minutes:10}]},
+    ]},
+  ],
+  activeAlarmSetId:'as1',
+  activePlanSetId:'ps1',
+};
+
+// ── STATE ───────────────────────────────────────────────────────
+let D = loadD();
+let taskStates = {};
+let editAlarmId = null;
+let editPlanId  = null;
+let tmpPresets  = [];
+let tmpPlans    = [];
+
+function loadD(){
+  try{ const s=localStorage.getItem('mpv2'); return s?JSON.parse(s):cl(DEFAULT); }
+  catch{ return cl(DEFAULT); }
+}
+function save(){ localStorage.setItem('mpv2',JSON.stringify(D)); }
+function cl(x){ return JSON.parse(JSON.stringify(x)); }
+function uid(){ return 'i'+(Date.now()+Math.random()).toString(36).replace('.',''); }
+
+// ── VIEW ────────────────────────────────────────────────────────
+function switchView(v,btn){
+  document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  btn.classList.add('active');
+  if(v==='edit') initEdit();
+  if(v==='plan') refreshPlan();
+}
+
+// ══ PLAN VIEW ═══════════════════════════════════════════════════
+function refreshPlan(){
+  const asel=document.getElementById('sel-alarm-set');
+  asel.innerHTML=D.alarmSets.map(s=>`<option value="${s.id}"${s.id===D.activeAlarmSetId?' selected':''}>${s.name}</option>`).join('');
+  const psel=document.getElementById('sel-plan-set');
+  psel.innerHTML=D.planSets.map(s=>`<option value="${s.id}"${s.id===D.activePlanSetId?' selected':''}>${s.name}</option>`).join('');
+  renderPills();
+  document.getElementById('planCard').style.display='none';
+}
+function onAlarmSetChange(){
+  D.activeAlarmSetId=document.getElementById('sel-alarm-set').value;
+  save(); renderPills();
+  document.getElementById('planCard').style.display='none';
+}
+function onPlanSetChange(){
+  D.activePlanSetId=document.getElementById('sel-plan-set').value;
+  save();
+  document.getElementById('planCard').style.display='none';
+}
+function renderPills(){
+  const set=D.alarmSets.find(s=>s.id===D.activeAlarmSetId);
+  const w=document.getElementById('alarmPresets'); w.innerHTML='';
+  if(!set) return;
+  set.presets.forEach(t=>{
+    const b=document.createElement('button'); b.className='preset-pill'; b.textContent=t;
+    b.onclick=()=>{ document.getElementById('wakeTime').value=t; };
+    w.appendChild(b);
+  });
+}
+function pickPlan(wt){
+  const set=D.planSets.find(s=>s.id===D.activePlanSetId);
+  if(!set||!set.plans.length) return null;
+  const [h,m]=wt.split(':').map(Number), mins=h*60+m;
+  for(const p of set.plans){
+    if(!p.cutoff) return p;
+    const [ch,cm]=p.cutoff.split(':').map(Number);
+    if(mins<=ch*60+cm) return p;
+  }
+  return set.plans[set.plans.length-1];
+}
+function buildPlan(){
+  const wt=document.getElementById('wakeTime').value;
+  const plan=pickPlan(wt);
+  if(!plan){ alert('プランセットが空です。編集タブでプランを追加してください。'); return; }
+  taskStates={};
+  plan.mustTasks.forEach((_,i)=>taskStates['must_'+i]=false);
+  plan.optTasks.forEach((_,i)=>taskStates['opt_'+i]=false);
+  const card=document.getElementById('planCard');
+  card.style.display='block'; renderCard(plan,card);
+}
+function renderCard(plan,card){
+  const mDone=plan.mustTasks.every((_,i)=>taskStates['must_'+i]);
+  const mCk=plan.mustTasks.filter((_,i)=>taskStates['must_'+i]).length;
+  const oCk=plan.optTasks.filter((_,i)=>taskStates['opt_'+i]).length;
+  const total=plan.mustTasks.length+plan.optTasks.length;
+  const ck=mCk+oCk;
+  const pct=total?Math.round(ck/total*100):0;
+  const anyDone=Object.values(taskStates).some(v=>v);
+  let h=`<div class="plan-header">
+    <span class="plan-badge" style="background:${plan.color}22;color:${plan.color};border:1px solid ${plan.color}44">${plan.id}</span>
+    <span class="plan-name">${plan.name}</span></div>
+  <div class="plan-desc">${plan.desc}</div>
+  <div class="sec-label">■ 絶対やること</div>`;
+  plan.mustTasks.forEach((t,i)=>{
+    const d=taskStates['must_'+i];
+    h+=`<div class="task-item must ${d?'done':''}" onclick="tap('must',${i})">
+      <div class="task-check">${d?'✓':''}</div><span class="task-label">${t.label}</span><span class="task-mins">${t.minutes}分</span></div>`;
+  });
+  h+=`<div class="sec-label">○ できればやること</div>`;
+  plan.optTasks.forEach((t,i)=>{
+    const d=taskStates['opt_'+i];
+    h+=`<div class="task-item opt ${d?'done':''}" onclick="tap('opt',${i})">
+      <div class="task-check">${d?'✓':''}</div><span class="task-label">${t.label}</span><span class="task-mins">${t.minutes}分</span></div>`;
+  });
+  h+=`<div class="blocker-bar ${anyDone&&!mDone?'on':''}">⚠ 「絶対やること」が残っています</div>
+  <div class="prog-wrap"><div class="prog-bg"><div class="prog-fill" style="width:${pct}%"></div></div>
+  <div class="prog-label">${ck} / ${total} 完了</div></div>
+  <div class="done-msg ${mDone&&ck===total?'on':''}">✓ 準備完了！いってらっしゃい</div>`;
+  card.innerHTML=h;
+}
+function tap(type,idx){
+  taskStates[type+'_'+idx]=!taskStates[type+'_'+idx];
+  const plan=pickPlan(document.getElementById('wakeTime').value);
+  if(plan) renderCard(plan,document.getElementById('planCard'));
+}
+
+// ══ EDIT VIEW ═══════════════════════════════════════════════════
+function switchEditTab(tab,btn){
+  document.querySelectorAll('.edit-tab').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.edit-panel').forEach(e=>e.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+function initEdit(){
+  populateAlarmSelect(); loadAlarmEditor();
+  populatePlanSelect();  loadPlanEditor();
+}
+
+// ─ ALARM SET EDITOR ─────────────────────────────────────────────
+function populateAlarmSelect(){
+  const sel=document.getElementById('alarm-set-select');
+  sel.innerHTML=D.alarmSets.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  if(editAlarmId) sel.value=editAlarmId;
+  editAlarmId=sel.value;
+}
+function loadAlarmEditor(){
+  editAlarmId=document.getElementById('alarm-set-select').value;
+  const set=D.alarmSets.find(s=>s.id===editAlarmId); if(!set) return;
+  document.getElementById('alarm-set-name').value=set.name;
+  tmpPresets=cl(set.presets);
+  renderPresetEditor();
+}
+function renderPresetEditor(){
+  const list=document.getElementById('alarm-preset-list'); list.innerHTML='';
+  tmpPresets.forEach((t,i)=>{
+    const d=document.createElement('div'); d.className='preset-edit-item';
+    d.innerHTML=`<input type="time" value="${t}" onchange="tmpPresets[${i}]=this.value">
+    <button class="del-btn" onclick="tmpPresets.splice(${i},1);renderPresetEditor()">×</button>`;
+    list.appendChild(d);
+  });
+}
+function addAlarmPreset(){ tmpPresets.push('07:00'); renderPresetEditor(); }
+function renameAlarmSet(){
+  const set=D.alarmSets.find(s=>s.id===editAlarmId); if(!set) return;
+  const n=document.getElementById('alarm-set-name').value.trim(); if(!n) return;
+  set.name=n; save(); populateAlarmSelect(); refreshPlan(); flash('alarm-save-notice');
+}
+function saveAlarmSetEditor(){
+  const set=D.alarmSets.find(s=>s.id===editAlarmId); if(!set) return;
+  const n=document.getElementById('alarm-set-name').value.trim();
+  if(n) set.name=n;
+  set.presets=cl(tmpPresets);
+  save(); populateAlarmSelect(); refreshPlan(); flash('alarm-save-notice');
+}
+function newAlarmSet(){
+  modal('新しいアラームセット名','',name=>{
+    if(!name) return;
+    const s={id:uid(),name,presets:['07:00']};
+    D.alarmSets.push(s); save();
+    editAlarmId=s.id; populateAlarmSelect(); loadAlarmEditor();
+  });
+}
+function deleteAlarmSet(){
+  if(D.alarmSets.length<=1){ alert('最低1つ必要です'); return; }
+  if(!confirm('削除しますか？')) return;
+  D.alarmSets=D.alarmSets.filter(s=>s.id!==editAlarmId);
+  if(D.activeAlarmSetId===editAlarmId) D.activeAlarmSetId=D.alarmSets[0].id;
+  save(); editAlarmId=null; populateAlarmSelect(); loadAlarmEditor(); refreshPlan();
+}
+function exportAlarmSet(){
+  const set=D.alarmSets.find(s=>s.id===editAlarmId); if(!set) return;
+  dlJSON({type:'alarm-set',data:set},`alarm-${set.name}.json`);
+}
+
+// ─ PLAN SET EDITOR ──────────────────────────────────────────────
+function populatePlanSelect(){
+  const sel=document.getElementById('plan-set-select');
+  sel.innerHTML=D.planSets.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  if(editPlanId) sel.value=editPlanId;
+  editPlanId=sel.value;
+}
+function loadPlanEditor(){
+  editPlanId=document.getElementById('plan-set-select').value;
+  const set=D.planSets.find(s=>s.id===editPlanId); if(!set) return;
+  document.getElementById('plan-set-name').value=set.name;
+  tmpPlans=cl(set.plans);
+  renderPlanEditor();
+}
+function renderPlanEditor(){
+  const wrap=document.getElementById('plan-edit-blocks'); wrap.innerHTML='';
+  tmpPlans.forEach((p,pi)=>{
+    const blk=document.createElement('div'); blk.className='plan-edit-block';
+    blk.innerHTML=`<div class="plan-edit-hdr" onclick="toggleBlock(${pi})">
+      <span class="dot" style="background:${p.color}"></span>
+      <span class="plabel">${p.name}</span>
+      <button class="del-plan-btn" onclick="event.stopPropagation();tmpPlans.splice(${pi},1);renderPlanEditor()">×</button>
+      <span id="parr-${pi}" style="font-size:11px;color:var(--muted)">▸</span>
+    </div>
+    <div class="plan-edit-body" id="pbody-${pi}">
+      <div class="field-row"><label>プラン名</label>
+        <input type="text" value="${p.name}" oninput="tmpPlans[${pi}].name=this.value;document.querySelector('#pbody-${pi}').closest('.plan-edit-block').querySelector('.plabel').textContent=this.value"></div>
+      <div class="field-row"><label>説明</label>
+        <input type="text" value="${p.desc}" oninput="tmpPlans[${pi}].desc=this.value"></div>
+      <div class="field-row"><label>上限時刻（空欄=最終プラン）</label>
+        <input type="time" value="${p.cutoff||''}" onchange="tmpPlans[${pi}].cutoff=this.value||null"></div>
+      <div class="field-row"><label>アクセントカラー</label>
+        <input type="text" value="${p.color}" oninput="tmpPlans[${pi}].color=this.value;this.closest('.plan-edit-block').querySelector('.dot').style.background=this.value"></div>
+      <div class="sec-label" style="padding:8px 0 4px">■ 絶対やること</div>
+      <ul class="task-edit-list" id="must-${pi}">
+        ${p.mustTasks.map((t,ti)=>trow(pi,'must',ti,t)).join('')}
+      </ul>
+      <button class="add-task-btn" onclick="addT(${pi},'must')">＋ 追加</button>
+      <div class="sec-label" style="padding:8px 0 4px">○ できればやること</div>
+      <ul class="task-edit-list" id="opt-${pi}">
+        ${p.optTasks.map((t,ti)=>trow(pi,'opt',ti,t)).join('')}
+      </ul>
+      <button class="add-task-btn" onclick="addT(${pi},'opt')">＋ 追加</button>
+    </div>`;
+    wrap.appendChild(blk);
+  });
+}
+function trow(pi,type,ti,t){
+  return `<li class="task-edit-row">
+    <input type="text" value="${t.label}" oninput="tmpPlans[${pi}].${type}Tasks[${ti}].label=this.value">
+    <input class="mins-input" type="number" value="${t.minutes}" min="1" max="120" oninput="tmpPlans[${pi}].${type}Tasks[${ti}].minutes=parseInt(this.value)||1">
+    <button class="del-btn" onclick="tmpPlans[${pi}].${type}Tasks.splice(${ti},1);renderPlanEditor();openBlock(${pi})">×</button>
+  </li>`;
+}
+function toggleBlock(pi){
+  const body=document.getElementById('pbody-'+pi),arr=document.getElementById('parr-'+pi);
+  arr.textContent=body.classList.toggle('open')?'▾':'▸';
+}
+function openBlock(pi){
+  document.getElementById('pbody-'+pi).classList.add('open');
+  document.getElementById('parr-'+pi).textContent='▾';
+}
+function addT(pi,type){ tmpPlans[pi][type+'Tasks'].push({label:'新しいタスク',minutes:5}); renderPlanEditor(); openBlock(pi); }
+function addPlan(){
+  tmpPlans.push({id:'X',name:'新しいプラン',color:'#c8f060',cutoff:null,desc:'',mustTasks:[],optTasks:[]});
+  renderPlanEditor(); openBlock(tmpPlans.length-1);
+}
+function renamePlanSet(){
+  const set=D.planSets.find(s=>s.id===editPlanId); if(!set) return;
+  const n=document.getElementById('plan-set-name').value.trim(); if(!n) return;
+  set.name=n; save(); populatePlanSelect(); refreshPlan(); flash('plan-save-notice');
+}
+function savePlanSetEditor(){
+  const set=D.planSets.find(s=>s.id===editPlanId); if(!set) return;
+  const n=document.getElementById('plan-set-name').value.trim();
+  if(n) set.name=n;
+  set.plans=cl(tmpPlans);
+  save(); populatePlanSelect(); refreshPlan(); flash('plan-save-notice');
+}
+function newPlanSet(){
+  modal('新しいプランセット名','',name=>{
+    if(!name) return;
+    const s={id:uid(),name,plans:[]};
+    D.planSets.push(s); save();
+    editPlanId=s.id; populatePlanSelect(); loadPlanEditor();
+  });
+}
+function deletePlanSet(){
+  if(D.planSets.length<=1){ alert('最低1つ必要です'); return; }
+  if(!confirm('削除しますか？')) return;
+  D.planSets=D.planSets.filter(s=>s.id!==editPlanId);
+  if(D.activePlanSetId===editPlanId) D.activePlanSetId=D.planSets[0].id;
+  save(); editPlanId=null; populatePlanSelect(); loadPlanEditor(); refreshPlan();
+}
+function exportPlanSet(){
+  const set=D.planSets.find(s=>s.id===editPlanId); if(!set) return;
+  dlJSON({type:'plan-set',data:set},`plans-${set.name}.json`);
+}
+
+// ── EXPORT / IMPORT ALL ─────────────────────────────────────────
+function exportAll(){ dlJSON(D,'morning-planner-all.json'); }
+function importAll(evt){
+  const file=evt.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d.alarmSets||!d.planSets) throw new Error('形式エラー');
+      if(!confirm('既存データを上書きします。よろしいですか？')) return;
+      D=d; save(); initEdit(); refreshPlan(); alert('インポート完了');
+    }catch(err){ alert('インポート失敗: '+err.message); }
+  };
+  r.readAsText(file);
+}
+
+// ── UTILS ───────────────────────────────────────────────────────
+function dlJSON(obj,fname){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));
+  a.download=fname; a.click();
+}
+function flash(id){ const e=document.getElementById(id); e.classList.add('on'); setTimeout(()=>e.classList.remove('on'),2000); }
+
+let _mcb=null;
+function modal(title,def,cb){
+  _mcb=cb;
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-input').value=def;
+  document.getElementById('modal').classList.add('on');
+  setTimeout(()=>document.getElementById('modal-input').focus(),40);
+  document.getElementById('modal-ok').onclick=()=>{ const v=document.getElementById('modal-input').value.trim(); closeModal(); if(_mcb) _mcb(v); };
+  document.getElementById('modal-input').onkeydown=e=>{ if(e.key==='Enter') document.getElementById('modal-ok').click(); if(e.key==='Escape') closeModal(); };
+}
+function closeModal(){ document.getElementById('modal').classList.remove('on'); _mcb=null; }
+
+// ── INIT ────────────────────────────────────────────────────────
+refreshPlan();
+</script>
+</body>
+</html>
